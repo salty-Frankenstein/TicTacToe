@@ -1,43 +1,97 @@
 import asyncio
-import json
+import message as msg
+import time
+import random
 
-class Client():
-    def __init__(self, host, port) -> None:
+
+def generate_player_id():
+    timestamp = int(time.time() * 1000)
+    random_part = random.randint(1000, 9999)
+    return f"{timestamp}{random_part}"
+
+
+async def async_input(prompt):
+    loop = asyncio.get_running_loop()
+    return await loop.run_in_executor(None, input, prompt)
+
+
+class Client(msg.Message):
+    def __init__(self, address) -> None:
+        super().__init__(True)
         # address of server
-        self.HOST = host
-        self.PORT = port
-    
+        self.server = address
+        # player id, it should be unique
+        self.id = generate_player_id()
+
     async def start(self):
-        self.reader, self.writer = await asyncio.open_connection(self.HOST, self.PORT)
+        self.reader, self.writer = await asyncio.open_connection(
+            self.server.HOST, self.server.PORT)
 
     async def close(self):
         self.writer.close()
         await self.writer.wait_closed()
 
     async def sendMessage(self, message):
-        # prepare the json data to send
-        json_data = json.dumps(message).encode()
-        msg_length = len(json_data).to_bytes(4, byteorder="big")  # length prefix
-
-        # send the prefix + data
-        self.writer.write(msg_length + json_data)
-        await self.writer.drain()
+        await super().sendMessage(self.writer, message)
 
     async def receiveMessage(self):
-        # receive response
-        length_data = await self.reader.readexactly(4)  # read the length prefix
-        response_length = int.from_bytes(length_data, byteorder="big")
-        response_data = await self.reader.readexactly(response_length)
-        response = json.loads(response_data.decode())
-        return response
+        return await super().receiveMessage(self.reader)
+
+    async def match(self):
+        '''
+        matching procedure
+        '''
+        while True:
+            message = {
+                "from": "client",
+                "id": self.id,
+                "operation": "match"}
+            await self.sendMessage(message)
+            res = await self.receiveMessage()
+            if res['status'] == 'ok':
+                # TODO: Do ok
+                return
+            elif res['status'] == 'wait':
+                await asyncio.sleep(res['time'])
+
+    async def cancelMatch(self):
+        message = {
+            "from": "client",
+            "id": self.id,
+            "operation": "cancel"
+        }
+        await self.sendMessage(message)
+        res = await self.receiveMessage()
+        # TODO: check result?
+
+    async def run(self):
+        '''
+        main logic of client
+        '''
+        print('client started')
+        while True:
+            res = await async_input('menu>')
+            if res == 'quit':
+                return
+            elif res == 'match':
+                print('now matching:')
+                # this task will wait until finish matching
+                task = asyncio.create_task(self.match())
+                while True:
+                    # user can cancel while waiting
+                    res = await async_input('match>')
+                    if res == 'quit':
+                        task.cancel()
+                        # ask main server to cancel
+                        await self.cancelMatch()
+                        break
+
 
 async def run():
-    client = Client('127.0.0.1',8000)
+    client = Client(msg.Address('127.0.0.1', 8000))
     await client.start()
-    message = {"action": "move", "player": "X", "position": [0, 1]}
-    await client.sendMessage(message)
-    res = await client.receiveMessage()
-    print(f"the result is: {res}")
+    await client.run()
+    await client.close()
 
 if __name__ == "__main__":
     asyncio.run(run())
