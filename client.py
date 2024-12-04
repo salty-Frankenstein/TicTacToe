@@ -2,7 +2,7 @@ import asyncio
 import message as msg
 import time
 import random
-
+import signal
 
 def generate_player_id():
     timestamp = int(time.time() * 1000)
@@ -37,22 +37,23 @@ class Client(msg.Message):
     async def receiveMessage(self):
         return await super().receiveMessage(self.reader)
 
-    async def match(self):
+    async def match(self, event):
         '''
         matching procedure
         '''
-        while True:
+        while not event.is_set():
             message = {
                 "from": "client",
                 "id": self.id,
                 "operation": "match"}
             await self.sendMessage(message)
             res = await self.receiveMessage()
-            if res['status'] == 'ok':
-                # TODO: Do ok
+            if res['status'] == 'match_ready':
                 return
             elif res['status'] == 'wait':
                 await asyncio.sleep(res['time'])
+            else:
+                assert 0
 
     async def cancelMatch(self):
         message = {
@@ -74,18 +75,25 @@ class Client(msg.Message):
             if res == 'quit':
                 return
             elif res == 'match':
-                print('now matching:')
+                print('now matching, press Ctrl+C to quit...')
                 # this task will wait until finish matching
-                task = asyncio.create_task(self.match())
-                while True:
-                    # user can cancel while waiting
-                    res = await async_input('match>')
-                    if res == 'quit':
-                        task.cancel()
-                        # ask main server to cancel
-                        await self.cancelMatch()
-                        break
 
+                stop_event = asyncio.Event()
+                
+                def handle_sigint():
+                    print("\nCtrl+C received! Stopping...")
+                    stop_event.set()
+                
+                loop = asyncio.get_event_loop()
+                loop.add_signal_handler(signal.SIGINT, handle_sigint)
+                task = asyncio.create_task(self.match(stop_event))  # 创建任务运行无限循环
+                await task  # 等待任务运行
+                if task.done():
+                    # matched
+                    print('matched!')
+                    pass
+                else:
+                    await self.cancelMatch()
 
 async def run():
     client = Client(msg.Address('127.0.0.1', 8000))

@@ -7,6 +7,7 @@ class MainServer(msg.MessageServer):
     def __init__(self, address, match_server) -> None:
         super().__init__(True, address)
         self.match_server = match_server
+        self.clients = {}
 
     async def startServer(self):
         server = await asyncio.start_server(
@@ -25,19 +26,36 @@ class MainServer(msg.MessageServer):
         try:
             while True:
                 message = await self.receiveMessage(reader)
-                if message['operation'] == 'match':
-                    await self.requestMatch(writer, message['id'])
-                elif message['operation'] == 'cancel':
-                    await self.requestCancel(writer, message['id'])
 
-                # response
-                # response = {"status": "ok", "received": message}
-                # await self.sendMessage(writer, response)
+                # register a new player
+                client_id = message['id']
+                if client_id not in self.clients.keys():
+                    self.clients[client_id] = (reader, writer)
+
+                if message['operation'] == 'match':
+                    await self.requestMatch(writer, client_id)
+                elif message['operation'] == 'cancel':
+                    await self.requestCancel(writer, client_id)
+
         except asyncio.IncompleteReadError:
             print(f"Connection closed by {addr}")
         finally:
             writer.close()
             await writer.wait_closed()
+
+    async def informClient(self, client_id):
+        '''
+        inform the client that matching is ready
+        '''
+        _, writer = self.clients[client_id]
+        # reader, writer = await asyncio.open_connection(addr.HOST, addr.PORT)
+        message = {
+            'from': 'main',
+            'status': 'match_ready'
+        }
+        await self.sendMessage(writer, message)
+        # writer.close()
+        # await writer.wait_closed()
 
     async def requestMatch(self, client_writer, player_id):
         '''
@@ -60,9 +78,10 @@ class MainServer(msg.MessageServer):
 
         if response['status'] == 'ok':
             # there's a player ready to match
-            # then
+            # tell the clients to get ready
+            await self.informClient(response['player_id1'])
+            await self.informClient(response['player_id2'])
             # TODO: tell the game server to start game!
-            # TODO: tell the clients to get ready
             # print(f'tell the game server with {response['player_id1']}, {response['player_id2']}')
             pass
         else:
