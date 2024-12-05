@@ -24,7 +24,7 @@ class Grid:
 
     def colomn(self, i):
         assert i >= 0 and i <= 2
-        return [i[1] for i in self.__grid]
+        return [l[i] for l in self.__grid]
 
     def diag(self, i):
         if i == 1:
@@ -134,6 +134,7 @@ class GameServer(msg.MessageServer):
                 message = {
                     'from': 'game',
                     'game_id': game_id,
+                    'grid': grid.show(),
                     'operation': 'finish',
                     'winner': turn_player
                 }

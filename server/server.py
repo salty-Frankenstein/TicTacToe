@@ -73,6 +73,7 @@ class MainServer(msg.MessageServer):
                         msg_to_player = {
                             'from': 'main',
                             'status': 'finish',
+                            'grid': message['grid'],
                             'winner': message['winner']
                         }
                         # send to both players

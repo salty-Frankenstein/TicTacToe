@@ -4,7 +4,7 @@ import time
 import random
 import signal
 
-debug = True
+debug = False
 
 
 def generate_player_id():
@@ -114,6 +114,7 @@ class Client(msg.Message):
             # wait for a new turn
             message = await self.receiveMessage()
             if message['status'] == 'finish':
+                print(message['grid'])
                 if message['winner'] == player:
                     print('You win!')
                 else:
