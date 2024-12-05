@@ -4,6 +4,8 @@ import time
 import random
 import signal
 
+debug = True
+
 
 def generate_player_id():
     timestamp = int(time.time() * 1000)
@@ -34,7 +36,7 @@ def readXY(s):
 
 class Client(msg.Message):
     def __init__(self, address) -> None:
-        super().__init__(True)
+        super().__init__(debug)
         # address of server
         self.server = address
         # player id, it should be unique
@@ -82,6 +84,29 @@ class Client(msg.Message):
         res = await self.receiveMessage()
         # TODO: check result?
 
+    async def place(self, game_id, player):
+        '''
+        the procedure for asking player to input and tell the server
+        '''
+        while True:
+            res = await async_input('game> ')
+            res = readXY(res)
+            if res:
+                x, y = res
+                response = {
+                    'from': 'client',
+                    'operation': 'place',
+                    'game_id': game_id,
+                    'id': self.id,
+                    'player': player,
+                    'x': x,
+                    'y': y
+                }
+                await self.sendMessage(response)
+                break
+            else:
+                print('invalid move, please input x y')
+
     async def playGame(self, player, game_id):
         c = 'O' if player == 1 else 'X'
         print('Game started, you are player ' + c)
@@ -94,38 +119,25 @@ class Client(msg.Message):
                 else:
                     print('You lose.')
                 break
-            # for some reasons, there could be response from main on the fly
-            # for matching's result, although we already entered the game
-            # therefore, check the message status first
+            elif message['status'] == 'retry':
+                print('Invalid move, please try again.')
+                await self.place(game_id, player)
             elif message['status'] != 'game':
-                continue
-            print(message['grid'])
-
-            if message['turn_player'] == player:
-                # if it's my turn
-                print('You move! Input x y:')
-                while True:
-                    res = await async_input('game> ')
-                    res = readXY(res)
-                    if res:
-                        x, y = res
-                        response = {
-                            'from': 'client',
-                            'operation': 'place',
-                            'game_id': game_id,
-                            'id': self.id,
-                            'player': player,
-                            'x': x,
-                            'y': y
-                        }
-                        await self.sendMessage(response)
-                        break
-                    else:
-                        print('invalid move, please input x y')
-
+                # for some reasons, there could be response from main on the fly
+                # for matching's result, although we already entered the game
+                # therefore, check the message status first
+                pass
             else:
-                # not my turn, just wait for next turn
-                print("opponent's turn, please wait...")
+                # normal case
+                print(message['grid'])
+
+                if message['turn_player'] == player:
+                    # if it's my turn
+                    print('You move! Input x y:')
+                    await self.place(game_id, player)
+                else:
+                    # not my turn, just wait for next turn
+                    print("opponent's turn, please wait...")
 
     async def run(self):
         '''

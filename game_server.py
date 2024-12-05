@@ -11,6 +11,9 @@ class Grid:
     def isPlayer(self, player):
         return player == 1 or player == 2
 
+    def checkValid(self, x, y):
+        return self.__grid[x][y] == 0
+
     def place(self, x, y, player):
         assert self.isPlayer(player)
         self.__grid[x][y] = player
@@ -75,8 +78,8 @@ class GameServer(msg.MessageServer):
     the game server, for the main game logic
     '''
 
-    def __init__(self, address, main_server) -> None:
-        super().__init__(True, address)
+    def __init__(self, debug, address, main_server) -> None:
+        super().__init__(debug, address)
         self.main_server = main_server
         self.game_id = 0
 
@@ -108,11 +111,23 @@ class GameServer(msg.MessageServer):
                 'turn_player': turn_player
             }
             await self.sendMessage(writer, message)
-            # get player's move
-            response = await self.receiveMessage(reader)
-            # perform playes's move
-            x, y = response['x'], response['y']
-            grid.place(x, y, turn_player)
+            # perform playes's move, retry until complete
+            while True:
+                # get player's move
+                response = await self.receiveMessage(reader)
+                x, y = response['x'], response['y']
+                if grid.checkValid(x, y):
+                    grid.place(x, y, turn_player)
+                    break
+                else:
+                    # tell the player to place again
+                    message = {
+                        'from': 'game',
+                        'operation': 'retry',
+                        'game_id': game_id,
+                        'player': turn_player
+                    }
+                    await self.sendMessage(writer, message)
 
             # check winning
             if grid.checkWin(turn_player):
@@ -169,5 +184,5 @@ class GameServer(msg.MessageServer):
 
 
 if __name__ == "__main__":
-    server = GameServer(config.game_server, config.main_server)
+    server = GameServer(config.debug, config.game_server, config.main_server)
     asyncio.run(server.startServer())

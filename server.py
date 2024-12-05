@@ -4,8 +4,8 @@ import config
 
 
 class MainServer(msg.MessageServer):
-    def __init__(self, address, match_server, game_server) -> None:
-        super().__init__(True, address)
+    def __init__(self, debug, address, match_server, game_server) -> None:
+        super().__init__(debug, address)
         self.match_server = match_server
         self.game_server = game_server
         # mapping from client id to its connection
@@ -60,6 +60,15 @@ class MainServer(msg.MessageServer):
                         # send to both players
                         await self.sendToClient(player1, msg_to_player)
                         await self.sendToClient(player2, msg_to_player)
+                    elif message['operation'] == 'retry':
+                        msg_to_player = {
+                            'from': 'main',
+                            'status': 'retry',
+                        }
+                        if message['player'] == 1:
+                            await self.sendToClient(player1, msg_to_player)
+                        else:
+                            await self.sendToClient(player2, msg_to_player)
                     elif message['operation'] == 'finish':
                         msg_to_player = {
                             'from': 'main',
@@ -81,6 +90,7 @@ class MainServer(msg.MessageServer):
         send message to a client
         '''
         _, writer = self.clients[client_id]
+        print(f"send to {client_id}")
         await self.sendMessage(writer, message)
 
     async def startGame(self, player1, player2):
@@ -178,6 +188,6 @@ class MainServer(msg.MessageServer):
 
 
 if __name__ == "__main__":
-    server = MainServer(config.main_server,
+    server = MainServer(config.debug, config.main_server,
                         config.match_server, config.game_server)
     asyncio.run(server.startServer())

@@ -8,8 +8,8 @@ class MatchServer(msg.MessageServer):
     the matching server, responsible for matching players
     '''
 
-    def __init__(self, address, main_server) -> None:
-        super().__init__(True, address)
+    def __init__(self, debug, address, main_server) -> None:
+        super().__init__(debug, address)
         # the address of main server
         self.main_server = main_server
         self.lock = asyncio.Lock()
@@ -89,5 +89,5 @@ class MatchServer(msg.MessageServer):
 
 
 if __name__ == "__main__":
-    server = MatchServer(config.match_server, config.main_server)
+    server = MatchServer(config.debug, config.match_server, config.main_server)
     asyncio.run(server.startServer())

@@ -6,11 +6,16 @@ class Message:
     '''
     def __init__(self, debug) -> None:
         self.debug = debug
+        self.msg_id = 0
 
     async def sendMessage(self, writer, message):
         ''' send message to client
             message is in json format, a dict
         '''
+        if self.debug:
+            self.msg_id += 1
+            message['__msg_id'] = self.msg_id
+            print(f'sending message: {message}')
         response_data = json.dumps(message).encode()
         response_length = len(response_data).to_bytes(4, byteorder="big")
 
