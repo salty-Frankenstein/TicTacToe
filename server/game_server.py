@@ -54,6 +54,14 @@ class Grid:
             return True
         return False
 
+    def checkDraw(self):
+        flag = True
+        for i in range(3):
+            for j in range(3):
+                if self.__grid[i][j] == 0:
+                    flag = False
+        return flag
+
     def show(self):
         def showChar(i):
             if i == 0:
@@ -137,6 +145,16 @@ class GameServer(msg.MessageServer):
                     'grid': grid.show(),
                     'operation': 'finish',
                     'winner': turn_player
+                }
+                await self.sendMessage(writer, message)
+                break
+            elif grid.checkDraw():
+                message = {
+                    'from': 'game',
+                    'game_id': game_id,
+                    'grid': grid.show(),
+                    'operation': 'finish',
+                    'winner': 0
                 }
                 await self.sendMessage(writer, message)
                 break

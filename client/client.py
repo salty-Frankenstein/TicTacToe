@@ -3,6 +3,7 @@ import message as msg
 import time
 import random
 import signal
+import platform
 
 debug = False
 
@@ -115,7 +116,9 @@ class Client(msg.Message):
             message = await self.receiveMessage()
             if message['status'] == 'finish':
                 print(message['grid'])
-                if message['winner'] == player:
+                if message['winner'] == 0:
+                    print("It's a draw!")
+                elif message['winner'] == player:
                     print('You win!')
                 else:
                     print('You lose.')
@@ -160,7 +163,8 @@ class Client(msg.Message):
                     stop_event.set()
 
                 loop = asyncio.get_event_loop()
-                loop.add_signal_handler(signal.SIGINT, handle_sigint)
+                if platform.system() != "Windows":
+                    loop.add_signal_handler(signal.SIGINT, handle_sigint)
                 task = asyncio.create_task(self.match(stop_event))
                 await task
                 if task.done():
